@@ -132,54 +132,56 @@ export function describeEvents(
   const name = (address: string): string =>
     members.find(m => m.address === address)?.displayName ?? shorten(address)
 
-  return events.map(e => {
-    const topic = e.topic
-    const dataArr = Array.isArray(e.data) ? e.data : null
-    const amount = typeof e.data === 'number' ? e.data : (dataArr?.[1] as number | undefined)
-    let description = 'Activity on the household'
+  return events
+    .filter(e => e && e.type)
+    .map(e => {
+      const topic = e.topic
+      const dataArr = Array.isArray(e.data) ? e.data : null
+      const amount = typeof e.data === 'number' ? e.data : (dataArr?.[1] as number | undefined)
+      let description = 'Activity on the household'
 
-    switch (e.type) {
-      case 'household_created':
-        description = `${name(topic[1])} created the household`
-        break
-      case 'member_added':
-        description = `${name(topic[1])} was added to the household`
-        break
-      case 'member_removed':
-        description = `${name(topic[1])} was removed from the household`
-        break
-      case 'bill_created':
-        description = `${name(topic[2])} created a bill${amount !== undefined ? ` · ${formatAmt(amount)}` : ''}`
-        break
-      case 'bill_updated':
-        description = 'A bill was updated'
-        break
-      case 'bill_paid':
-        description = `${name(topic[2])} paid ${formatAmt(amount)} for a bill`
-        break
-      case 'settlement_created':
-        description = `Payment of ${formatAmt(amount)} from ${name(topic[2])} was started`
-        break
-      case 'settlement_completed':
-        description = `${name(topic[2])} paid · transaction confirmed`
-        break
-      case 'settlement_failed':
-        description = 'A settlement attempt failed'
-        break
-      case 'period_closed':
-        description = 'The monthly period was closed'
-        break
-    }
+      switch (e.type) {
+        case 'household_created':
+          description = `${name(topic[1])} created the household`
+          break
+        case 'member_added':
+          description = `${name(topic[1])} was added to the household`
+          break
+        case 'member_removed':
+          description = `${name(topic[1])} was removed from the household`
+          break
+        case 'bill_created':
+          description = `${name(topic[2])} created a bill${amount !== undefined ? ` · ${formatAmt(amount)}` : ''}`
+          break
+        case 'bill_updated':
+          description = 'A bill was updated'
+          break
+        case 'bill_paid':
+          description = `${name(topic[2])} paid ${formatAmt(amount)} for a bill`
+          break
+        case 'settlement_created':
+          description = `Payment of ${formatAmt(amount)} from ${name(topic[2])} was started`
+          break
+        case 'settlement_completed':
+          description = `${name(topic[2])} paid · transaction confirmed`
+          break
+        case 'settlement_failed':
+          description = 'A settlement attempt failed'
+          break
+        case 'period_closed':
+          description = 'The monthly period was closed'
+          break
+      }
 
-    return {
-      id: e.id,
-      type: e.type,
-      ledger: e.ledger,
-      at: Date.now(),
-      householdId: e.householdId,
-      description,
-    }
-  })
+      return {
+        id: e.id,
+        type: e.type,
+        ledger: e.ledger,
+        at: Date.now(),
+        householdId: e.householdId,
+        description,
+      }
+    })
 }
 
 function formatAmt(cents?: number): string {
