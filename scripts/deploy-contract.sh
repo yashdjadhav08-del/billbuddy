@@ -28,7 +28,7 @@ stellar network add "$NETWORK" \
   --network-passphrase "Test SDF Network ; September 2015" >/dev/null 2>&1 || true
 
 echo "> Ensuring deployer key ($KEY_NAME)..."
-if ! stellar keys list 2>/dev/null | grep -q "$KEY_NAME"; then
+if ! stellar keys ls 2>/dev/null | grep -q "$KEY_NAME"; then
   stellar keys generate "$KEY_NAME" --network "$NETWORK"
 fi
 
@@ -39,9 +39,15 @@ echo "> Deployer address: $ADDRESS"
 echo "> Funding deployer via Friendbot (testnet)..."
 curl -s "https://friendbot.stellar.org/?addr=${ADDRESS}" >/dev/null || true
 
+# The Soroban validator rejects the overlong LEB encodings newer rustc emits,
+# so canonicalize the module with wasm-opt before uploading.
+echo "> Optimizing WASM (wasm-opt)..."
+OPTIMIZED="$DIR/contracts/billbuddy/target/wasm32-unknown-unknown/release/billbuddy.optimized.wasm"
+stellar contract optimize --wasm "$WASM" --wasm-out "$OPTIMIZED" >/dev/null 2>&1
+
 echo "> Deploying contract..."
 CONTRACT_ID="$(stellar contract deploy \
-  --wasm "$WASM" \
+  --wasm "$OPTIMIZED" \
   --source "$KEY_NAME" \
   --network "$NETWORK")"
 

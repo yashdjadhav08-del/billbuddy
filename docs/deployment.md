@@ -36,11 +36,20 @@ cd contracts/billbuddy
 cargo build --target wasm32-unknown-unknown --release
 ```
 
+The Soroban validator rejects the overlong LEB encodings newer rustc emits, so
+canonicalize the module with wasm-opt before deploying:
+
+```bash
+stellar contract optimize \
+  --wasm target/wasm32-unknown-unknown/release/billbuddy.wasm \
+  --wasm-out target/wasm32-unknown-unknown/release/billbuddy.optimized.wasm
+```
+
 ### Step 5 — Deploy
 
 ```bash
 stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/billbuddy.wasm \
+  --wasm target/wasm32-unknown-unknown/release/billbuddy.optimized.wasm \
   --source deployer \
   --network testnet
 ```
