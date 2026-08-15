@@ -1,0 +1,131 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  # Testnet-safe defaults for CI — no secrets required to pass checks
+  VITE_STELLAR_NETWORK: testnet
+  VITE_STELLAR_HORIZON_URL: https://horizon-testnet.stellar.org
+  VITE_SOROBAN_RPC_URL: https://soroban-testnet.stellar.org
+  VITE_STELLAR_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+  VITE_SOROBAN_CONTRACT_ID: ""
+  VITE_ASSET_CONTRACT_ID: ""
+  VITE_ASSET_CODE: XLM
+  VITE_ASSET_ISSUER: ""
+  VITE_EXPLORER_BASE_URL: https://stellar.expert/explorer/testnet
+  VITE_MOCK_MODE: "true"
+
+jobs:
+  # ─── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    name: Frontend (lint · typecheck · test · build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: web-dist
+          path: apps/web/dist
+          retention-days: 7
+
+  # ─── Rust / Soroban ─────────────────────────────────────────────────────────
+  contract:
+    name: Contract (fmt · clippy · test · build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/billbuddy
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/billbuddy/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('contracts/billbuddy/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Rust format check
+        run: cargo fmt --check
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --all-targets --features testutils -- -D warnings
+
+      - name: Run contract tests
+        run: cargo test --features testutils
+
+      - name: Build WASM
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main'
+        with:
+          name: contract-wasm
+          path: contracts/billbuddy/target/wasm32-unknown-unknown/release/billbuddy.wasm
+          retention-days: 30
+
+  # ─── Mock shared-state server ───────────────────────────────────────────────
+  mock-server:
+    name: Mock server (node --test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run mock-server tests
+        run: node --test mock-server.test.mjs
+
+  # ─── Summary gate ────────────────────────────────────────────────────────────
+  all-checks:
+    name: All checks passed
+    needs: [frontend, contract, mock-server]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All CI checks passed ✓"
