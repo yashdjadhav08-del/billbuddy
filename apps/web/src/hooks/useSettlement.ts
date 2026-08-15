@@ -98,6 +98,45 @@ export function useSettlement() {
     [household, requireWallet, addSettlement, updateSettlement, setLoading],
   )
 
+  /**
+   * Manually move money from the connected wallet to any account.
+   * The sender signs the payment in Freighter, so only their own funds move.
+   */
+  const sendTransfer = useCallback(
+    async (params: { to: string; amount: number; memo?: string }) => {
+      if (!household) throw new Error('No household loaded')
+      const payer = requireWallet()
+      if (params.amount <= 0) throw new Error('Amount must be greater than zero.')
+      if (payer === params.to) throw new Error('Sender and recipient cannot be the same account.')
+
+      setTxState({ status: 'signing', hash: null, error: null })
+      try {
+        const signedXdr = await stellarService.buildAndSignPayment({
+          from: payer,
+          to: params.to,
+          amount: params.amount,
+          memo: params.memo,
+        })
+
+        setTxState({ status: 'submitting', hash: null, error: null })
+        const txHash = await stellarService.submitTransaction(signedXdr)
+
+        setTxState({ status: 'confirming', hash: txHash, error: null })
+        await stellarService.waitForConfirmation(txHash)
+
+        setTxState({ status: 'success', hash: txHash, error: null })
+        toast.success('Money sent!')
+        return { txHash }
+      } catch (err) {
+        const msg = friendlyContractError(err)
+        setTxState({ status: 'error', hash: null, error: msg })
+        toast.error(msg)
+        throw err
+      }
+    },
+    [household, requireWallet],
+  )
+
   const closePeriod = useCallback(
     async (periodLabel: string) => {
       if (!household) throw new Error('No household loaded')
@@ -118,5 +157,5 @@ export function useSettlement() {
     [household, requireWallet, setLoading],
   )
 
-  return { settleTransfer, closePeriod, txState, resetTx }
+  return { settleTransfer, sendTransfer, closePeriod, txState, resetTx }
 }

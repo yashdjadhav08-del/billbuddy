@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { ExternalLink, ArrowRight, Loader2, CheckCircle, XCircle } from 'lucide-react'
+import {
+  ExternalLink,
+  ArrowRight,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  ArrowLeftRight,
+  Send,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -7,16 +15,18 @@ import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
 import { StatusDot } from '@/components/ui/status-dot'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { useAppStore } from '@/stores/appStore'
 import { useWalletStore } from '@/stores/walletStore'
 import { useSettlement } from '@/hooks/useSettlement'
-import { formatCents, shortenAddress } from '@/lib/money'
+import { formatCents, shortenAddress, toCents } from '@/lib/money'
 import { getExplorerTxUrl } from '@/config/env'
 import { currentPeriodLabel } from '@/lib/utils'
 import { allSettled } from '@/lib/balance'
 import type { SettlementTransfer, TxState } from '@/types'
-import { ArrowLeftRight } from 'lucide-react'
+import type { Member } from '@/types'
 
 // ─── TX Progress Modal ────────────────────────────────────────────────────────
 
@@ -45,17 +55,24 @@ function TxProgressModal({
     : txState.status === 'idle'
     ? 0
     : Math.round(((currentStep + 1) / TX_STEPS.length) * 90)
+  const isManual = transfer && !transfer.fromName
 
   return (
     <Dialog open={open} onOpenChange={open => !open && txState.status !== 'signing' && txState.status !== 'submitting' && txState.status !== 'confirming' && onClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>
-            {txState.status === 'success' ? '✓ Settlement Complete' : txState.status === 'error' ? 'Settlement Failed' : 'Processing Payment'}
+            {txState.status === 'success'
+              ? (isManual ? '✓ Money Sent' : '✓ Settlement Complete')
+              : txState.status === 'error'
+              ? (isManual ? 'Transfer Failed' : 'Settlement Failed')
+              : 'Processing Payment'}
           </DialogTitle>
           {transfer && (
             <DialogDescription>
-              {transfer.fromName} → {transfer.toName} · {formatCents(transfer.amount)}
+              {isManual
+                ? `You → ${shortenAddress(transfer.to, 4, 4)} · ${formatCents(transfer.amount)}`
+                : `${transfer.fromName} → ${transfer.toName} · ${formatCents(transfer.amount)}`}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -174,12 +191,106 @@ function TransferRow({
   )
 }
 
+// ─── Manual send-money card ───────────────────────────────────────────────────
+
+function SendMoneyCard({
+  members,
+  publicKey,
+  busy,
+  onSend,
+}: {
+  members: Member[]
+  publicKey: string | null
+  busy: boolean
+  onSend: (to: string, amount: number, memo?: string) => Promise<void> | void
+}) {
+  const [selectedMember, setSelectedMember] = useState<string>('')
+  const [customAddr, setCustomAddr] = useState('')
+  const [amountStr, setAmountStr] = useState('')
+  const [memo, setMemo] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const recipients = members.filter(m => m.active)
+  const target = customAddr.trim() || selectedMember
+
+  async function handleSend() {
+    setError(null)
+    if (!target) { setError('Pick a recipient or enter an address.'); return }
+    if (target === publicKey) { setError('Sender and recipient cannot be the same account.'); return }
+    const amount = toCents(parseFloat(amountStr) || 0)
+    if (amount <= 0) { setError('Enter an amount greater than zero.'); return }
+    try {
+      await onSend(target, amount, memo.trim() || undefined)
+      setSelectedMember(''); setCustomAddr(''); setAmountStr(''); setMemo('')
+    } catch {
+      // Error surfaced via toast/progress modal
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-4 w-4 text-indigo-500" />
+            Send money
+          </CardTitle>
+          <Badge variant="secondary">Manual transfer</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-3">
+        <div>
+          <p className="text-sm text-slate-500 mb-2">
+            Move money from your wallet to any Stellar account. You approve this in Freighter.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Input label="Amount (USD)" prefix="$" placeholder="0.00" value={amountStr} inputMode="decimal" onChange={e => setAmountStr(e.target.value)} />
+          </div>
+          <div>
+            <Select value={selectedMember} onValueChange={setSelectedMember}>
+              <SelectTrigger aria-label="Recipient">
+                <SelectValue placeholder="Recipient (household member)" />
+              </SelectTrigger>
+              <SelectContent>
+                {recipients.map(m => (
+                  <SelectItem key={m.address} value={m.address}>
+                    {m.displayName} · {shortenAddress(m.address, 3, 3)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Input label="Or enter any Stellar address" placeholder="GABCD…" value={customAddr}
+          onChange={e => setCustomAddr(e.target.value)}
+          hint={selectedMember ? 'Leave blank to use the selected member above.' : undefined}
+        />
+
+        <Input label="Memo (optional)" placeholder="e.g. August rent share" value={memo} maxLength={28}
+          onChange={e => setMemo(e.target.value)}
+        />
+
+        {error && <p className="text-sm text-red-600">{error}</p>}
+
+        <Button className="w-full" onClick={handleSend} disabled={busy}>
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {busy ? 'Sending…' : 'Send money'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function SettlementPage() {
   const { household, balances, transfers, settlements } = useAppStore()
   const { publicKey } = useWalletStore()
-  const { settleTransfer, txState, resetTx } = useSettlement()
+  const { settleTransfer, sendTransfer, txState, resetTx } = useSettlement()
 
   const [activeTransfer, setActiveTransfer] = useState<SettlementTransfer | null>(null)
   const [txModalOpen, setTxModalOpen] = useState(false)
@@ -293,6 +404,19 @@ export function SettlementPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Manual transfer */}
+      <SendMoneyCard
+        members={household.members}
+        publicKey={publicKey}
+        busy={txState.status !== 'idle' && txState.status !== 'success' && txState.status !== 'error'}
+        onSend={async (to, amount, memo) => {
+          setActiveTransfer({ from: publicKey ?? '', fromName: 'You', to, toName: '', amount })
+          resetTx()
+          setTxModalOpen(true)
+          await sendTransfer({ to, amount, memo })
+        }}
+      />
 
       {/* All member balances */}
       <Card>
