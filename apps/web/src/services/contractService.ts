@@ -36,7 +36,7 @@ import type { CreateBillInput } from '@/hooks/useBill'
 async function getSorobanClient() {
   const sdk = await import('@stellar/stellar-sdk')
   return {
-    SorobanRpc: sdk.SorobanRpc,
+    SorobanRpc: sdk.rpc,
     Contract: sdk.Contract,
     TransactionBuilder: sdk.TransactionBuilder,
     scValToNative: sdk.scValToNative,

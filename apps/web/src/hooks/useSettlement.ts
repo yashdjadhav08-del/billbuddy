@@ -3,6 +3,7 @@ import { useAppStore } from '@/stores/appStore'
 import { stellarService } from '@/services/stellarService'
 import { contractService } from '@/services/contractService'
 import { useWallet } from './useWallet'
+import { friendlyContractError } from '@/lib/contractErrors'
 import toast from 'react-hot-toast'
 import type { SettlementTransfer, TxState } from '@/types'
 
@@ -67,7 +68,7 @@ export function useSettlement() {
         toast.success('Settlement completed!')
         return { settlement: completed, txHash }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Settlement failed'
+        const msg = friendlyContractError(err)
         setTxState({ status: 'error', hash: null, error: msg })
 
         // Attempt to mark settlement as failed on-chain
@@ -108,8 +109,7 @@ export function useSettlement() {
         toast.success(`${periodLabel} closed!`)
         return updated
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to close period'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)

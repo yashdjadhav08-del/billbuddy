@@ -4,6 +4,7 @@ import { useWalletStore } from '@/stores/walletStore'
 import { useActivityStore } from '@/stores/activityStore'
 import { contractService } from '@/services/contractService'
 import { fetchContractEvents, describeEvents } from '@/services/activityService'
+import { friendlyContractError } from '@/lib/contractErrors'
 import { useWallet } from './useWallet'
 import toast from 'react-hot-toast'
 import type { Member } from '@/types'
@@ -25,8 +26,7 @@ export function useHousehold() {
         toast.success(`Household "${name}" created`)
         return hh
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to create household'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)
@@ -51,8 +51,7 @@ export function useHousehold() {
         toast.success(`${displayName} added`)
         return updated
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to add member'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)
@@ -77,14 +76,52 @@ export function useHousehold() {
         toast.success(`${member?.displayName ?? 'Member'} removed`)
         return updated
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to remove member'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)
       }
     },
     [household, requireWallet, setHousehold, setLoading],
+  )
+
+  /**
+   * Load an existing household by its numeric ID and set it as the active one.
+   * The connected wallet must be an active member, otherwise the contract
+   * exposes no mechanism to pull arbitrary households into the shared ledger.
+   * This is the recovery path for the "duplicate house" confusion: a wallet
+   * that was added to house #1 but whose discovery surfaced a different one
+   * can jump straight back to the shared house by ID.
+   */
+  const joinHousehold = useCallback(
+    async (id: number) => {
+      const caller = requireWallet()
+      setLoading(true)
+      try {
+        const hh = await contractService.getHousehold(id)
+        const amMember = hh.members.some(m => m.address === caller && m.active)
+        if (!amMember) {
+          throw new Error(
+            `You are not an active member of household #${id}. Ask the owner to add you first.`,
+          )
+        }
+        const [bills, settlements] = await Promise.all([
+          contractService.getBills(id),
+          contractService.getSettlements(id),
+        ])
+        setHousehold(hh)
+        setBills(bills)
+        setSettlements(settlements)
+        toast.success(`Joined "${hh.name}" (household #${id})`)
+        return hh
+      } catch (err) {
+        toast.error(friendlyContractError(err))
+        throw err
+      } finally {
+        setLoading(false)
+      }
+    },
+    [requireWallet, setHousehold, setBills, setSettlements, setLoading],
   )
 
   const syncHousehold = useCallback(async () => {
@@ -140,6 +177,7 @@ export function useHousehold() {
     createHousehold,
     addMember,
     removeMember,
+    joinHousehold,
     syncHousehold,
     activeMember,
   }

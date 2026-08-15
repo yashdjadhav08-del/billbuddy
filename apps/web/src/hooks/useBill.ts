@@ -3,6 +3,7 @@ import { useAppStore } from '@/stores/appStore'
 import { contractService } from '@/services/contractService'
 import { useWallet } from './useWallet'
 import { formatCents } from '@/lib/money'
+import { friendlyContractError } from '@/lib/contractErrors'
 import toast from 'react-hot-toast'
 import type { BillCategory, MemberContribution, MemberShare, SplitType } from '@/types'
 
@@ -31,8 +32,7 @@ export function useBill() {
         toast.success(`"${input.title}" added`)
         return bill
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to create bill'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)
@@ -52,8 +52,7 @@ export function useBill() {
         toast.success('Bill updated')
         return bill
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to update bill'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)
@@ -96,8 +95,7 @@ export function useBill() {
         toast.success(`You paid ${formatCents(outstanding)} for "${bill.title}"`)
         return updated
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Payment failed'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)
@@ -122,8 +120,7 @@ export function useBill() {
         useAppStore.getState().removeBill(bill.id)
         toast.success(`"${bill.title}" deleted`)
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Failed to delete bill'
-        toast.error(msg)
+        toast.error(friendlyContractError(err))
         throw err
       } finally {
         setLoading(false)

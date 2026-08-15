@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { UserPlus, Trash2, Crown, Users, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -79,18 +79,67 @@ function MemberCard({
   )
 }
 
-// ─── Create household form ────────────────────────────────────────────────────
+// ─── Create / join household form ─────────────────────────────────────────────
 
 function CreateHouseholdForm() {
-  const { createHousehold } = useHousehold()
+  const { createHousehold, joinHousehold } = useHousehold()
   const { status: walletStatus } = useWalletStore()
-  const isConnected = walletStatus === 'connected'
+  const [mode, setMode] = useState<'create' | 'join'>('create')
   const [name, setName] = useState('')
+  const [joinId, setJoinId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
+  const isConnected = walletStatus === 'connected'
+
+  // Warn when the wallet already belongs to a household, so the user does not
+  // accidentally create a second, separate household with the same name.
+  useEffect(() => {
+    let cancelled = false
+    async function checkExisting() {
+      try {
+        const { contractService } = await import('@/services/contractService')
+        const { useAppStore } = await import('@/stores/appStore')
+        const { useWalletStore: ws } = await import('@/stores/walletStore')
+        const pk = ws.getState().publicKey
+        if (!pk) return
+        const ids = await contractService.getUserHouseholds(pk)
+        if (cancelled || ids.length === 0) return
+        const current = useAppStore.getState().household
+        if (current && ids.includes(current.id)) return
+        setWarning(
+          `Your wallet is already a member of household${ids.length > 1 ? 's' : ''} #${ids.join(', ')}. ` +
+            'Creating a new household will make a separate one — use “Join existing” below to get back to a shared house.',
+        )
+      } catch {
+        // best-effort; discovery failing should not block the page
+      }
+    }
+    void checkExisting()
+    return () => { cancelled = true }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (mode === 'join') {
+      const id = Number(joinId.trim())
+      if (!joinId.trim() || !Number.isInteger(id) || id <= 0) {
+        setError('Enter a valid household ID (a number)')
+        return
+      }
+      setError('')
+      setLoading(true)
+      try {
+        await joinHousehold(id)
+        setJoinId('')
+      } catch {
+        // errors handled by hook
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     const trimmed = name.trim()
     if (!trimmed) { setError('Name is required'); return }
     setError('')
@@ -107,26 +156,74 @@ function CreateHouseholdForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create a household</CardTitle>
+        <CardTitle>
+          {mode === 'join' ? 'Join an existing household' : 'Create a household'}
+        </CardTitle>
       </CardHeader>
       <CardContent>
+        {warning && (
+          <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-700">
+            ⚠️ {warning}
+          </div>
+        )}
+
+        <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={() => { setMode('create'); setError('') }}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === 'create' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+            }`}
+            aria-pressed={mode === 'create'}
+          >
+            Create
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('join'); setError('') }}
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              mode === 'join' ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-700'
+            }`}
+            aria-pressed={mode === 'join'}
+          >
+            Join existing
+          </button>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <Input
-            label="Household name"
-            placeholder="e.g. Apartment 204"
-            value={name}
-            onChange={e => { setName(e.target.value); setError('') }}
-            error={error}
-            maxLength={64}
-            autoFocus
-          />
+          {mode === 'create' ? (
+            <Input
+              label="Household name"
+              placeholder="e.g. Apartment 204"
+              value={name}
+              onChange={e => { setName(e.target.value); setError('') }}
+              error={error}
+              maxLength={64}
+              autoFocus
+            />
+          ) : (
+            <div className="space-y-2">
+              <Input
+                label="Household ID"
+                placeholder="e.g. 1 (the number shown next to a shared house)"
+                value={joinId}
+                onChange={e => { setJoinId(e.target.value); setError('') }}
+                error={error}
+                inputMode="numeric"
+              />
+              <p className="text-xs text-slate-400">
+                The owner adds you to a household, and discovery should find it automatically. Use
+                this to jump straight to a specific household ID if it did not appear.
+              </p>
+            </div>
+          )}
           {!isConnected && (
             <p className="text-sm text-amber-600 bg-amber-50 rounded-xl px-4 py-3">
-              Connect your Freighter wallet to create a household.
+              Connect your Freighter wallet to {mode === 'create' ? 'create' : 'join'} a household.
             </p>
           )}
           <Button type="submit" loading={loading} disabled={!isConnected} className="w-full">
-            Create Household
+            {mode === 'create' ? 'Create Household' : 'Join Household'}
           </Button>
         </form>
       </CardContent>

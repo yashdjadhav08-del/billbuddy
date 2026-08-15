@@ -44,7 +44,7 @@ export function scvI128(value: number): xdr.ScVal {
 }
 
 export function scvBool(value: boolean): xdr.ScVal {
-  return nativeToScVal(value, { type: 'bool' }) as xdr.ScVal
+  return nativeToScVal(value) as xdr.ScVal
 }
 
 export function scvAddress(value: string): xdr.ScVal {
@@ -60,10 +60,16 @@ export function scvVariant(name: string): xdr.ScVal {
   return scvVec([scvSymbol(name)])
 }
 
-/** Encode a struct as an `ScvMap` with symbol keys. */
+/** Encode a struct as an `ScvMap` with symbol keys, keys sorted
+ *  lexicographically (Soroban requires map keys in sorted order). */
 export function scvMap(entries: Array<[string, xdr.ScVal]>): xdr.ScVal {
   return xdr.ScVal.scvMap(
-    entries.map(([key, val]) => new xdr.ScMapEntry({ key: scvSymbol(key), val })),
+    entries
+      .slice()
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(
+        ([key, val]) => new xdr.ScMapEntry({ key: scvSymbol(key), val }),
+      ),
   )
 }
 

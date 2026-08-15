@@ -39,7 +39,7 @@ export async function fetchContractEvents(): Promise<RawEvent[]> {
   if (!contractId || config.flags.mockMode) return []
 
   const sdk = await import('@stellar/stellar-sdk')
-  const server = new sdk.SorobanRpc.Server(config.stellar.sorobanRpcUrl)
+  const server = new sdk.rpc.Server(config.stellar.sorobanRpcUrl)
 
   let latest: number
   try {
