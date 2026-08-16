@@ -49,9 +49,11 @@ export class TransactionTimeoutError extends Error {
 
 class StellarService {
   private horizon: Horizon.Server
+  private networkPassphrase: string
 
   constructor() {
     this.horizon = new Horizon.Server(config.stellar.horizonUrl)
+    this.networkPassphrase = config.stellar.networkPassphrase
   }
 
   /**
@@ -147,11 +149,12 @@ class StellarService {
    * Returns the transaction hash on success.
    */
   async submitTransaction(signedXdr: string): Promise<string> {
+    const tx = TransactionBuilder.fromXDR(
+      signedXdr,
+      this.networkPassphrase,
+    )
     try {
-      const result = await this.horizon.submitTransaction(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { toXDR: () => signedXdr } as any,
-      )
+      const result = await this.horizon.submitTransaction(tx)
       return result.hash
     } catch (err) {
       // Parse Horizon error envelope for meaningful messages
