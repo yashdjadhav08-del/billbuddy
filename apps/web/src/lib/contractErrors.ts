@@ -57,15 +57,19 @@ const CONTRACT_ERROR_PATTERN = /Error\(Contract,\s*#(\d+)\)/
  * otherwise the raw (but event-log-stripped) message is returned.
  */
 export function friendlyContractError(err: unknown): string {
-  const raw = err instanceof Error ? err.message : String(err)
+  const raw = err instanceof Error ? err.message : String(err ?? 'Unknown error')
   const match = raw.match(CONTRACT_ERROR_PATTERN)
   if (match) {
     const entry = CONTRACT_CODES[Number(match[1])]
-    if (entry) return entry.message
+    if (entry?.message) return entry.message
+  }
+  // JS runtime errors from the SDK/Horizon (e.g. "Cannot read properties of undefined")
+  if (raw.includes('Cannot read properties of undefined')) {
+    return 'Unable to process the transaction — the wallet or network response was rejected. Please refresh the page, ensure both accounts are funded, and try again.'
   }
   // Strip the multi-line diagnostic event log so toasts stay readable.
   const single = raw.split('\n')[0] ?? raw
-  return single || 'Something went wrong.'
+  return (single && single.trim()) || 'Something went wrong.'
 }
 
 /** Whether an error maps to a known contract error code (e.g. for special casing). */
