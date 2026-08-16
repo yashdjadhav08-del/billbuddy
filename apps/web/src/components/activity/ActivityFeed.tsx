@@ -93,8 +93,8 @@ export function ActivityFeed() {
       </CardHeader>
       <CardContent className="pt-0">
         <div className="divide-y divide-slate-50">
-          {displayItems.slice(0, 12).map(item => {
-            const meta = TYPE_META[item.type]
+          {displayItems.slice(0, 12).filter(item => item).map(item => {
+            const meta = TYPE_META[item.type] ?? { emoji: '📝', tone: 'bg-slate-50' }
             return (
               <div key={item.id} className="flex items-center gap-3 py-2.5">
                 <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm ${meta.tone}`}>
