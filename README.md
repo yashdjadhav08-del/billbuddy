@@ -136,30 +136,22 @@ Mock mode is a developer-only fallback — it is never the source of truth.
 ### 1. Settlements & Balances
 Track net balances across household members and settle up instantly with real on-chain transfers.
 
-<p align="center">
-  <img src="./docs/screenshots/settlements.png" alt="Settlements View" width="100%" />
-</p>
+![Settlements View](https://github.com/yashdjadhav08-del/billbuddy/releases/download/v1.0.0/settlements.png)
 
 ### 2. Create & Split Bills
 Flexible expense splitting with equal, custom, or percentage allocations directly calculated on-chain.
 
-<p align="center">
-  <img src="./docs/screenshots/add-bill.png" alt="Add Bill" width="100%" />
-</p>
+![Add Bill](https://github.com/yashdjadhav08-del/billbuddy/releases/download/v1.0.0/add-bill.png)
 
 ### 3. On-Chain Settlement on StellarExpert
 Real-time verifiable settlement transaction on Stellar Testnet moving native XLM.
 
-<p align="center">
-  <img src="./docs/screenshots/stellar-expert-tx.png" alt="StellarExpert Transaction" width="100%" />
-</p>
+![StellarExpert Transaction](https://github.com/yashdjadhav08-del/billbuddy/releases/download/v1.0.0/stellar-expert-tx.png)
 
 ### 4. Continuous Integration (GitHub Actions)
 Full CI pipeline running linting, type-checking, Vitest suite, Soroban contract tests, and WASM compilation.
 
-<p align="center">
-  <img src="./docs/screenshots/ci-pipeline.png" alt="GitHub Actions CI Pipeline" width="100%" />
-</p>
+![GitHub Actions CI Pipeline](https://github.com/yashdjadhav08-del/billbuddy/releases/download/v1.0.0/ci-pipeline.png)
 
 ---
 
