@@ -65,8 +65,9 @@ export function useSync() {
       contractService
         .getBillsForMember(publicKey)
         .then(bills => useAppStore.getState().setBills(bills))
-        .catch(() => {
-          // best-effort; user data stays as-is
+        .catch(err => {
+          // Silently fail — user data stays as-is from cache
+          console.debug('Member bill poll failed:', err)
         })
     }
 
