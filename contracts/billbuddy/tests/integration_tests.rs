@@ -1061,3 +1061,174 @@ fn test_delete_bill_settled_fails() {
     assert_eq!(client.get_bills(&hh_id).len(), 1);
     assert_eq!(client.get_member_bills(&owner).len(), 1);
 }
+
+// ─── Inter-contract communication (token/SAC) tests ──────────────────────────
+
+/// Deploy a Stellar Asset Contract and mint `amount` tokens to `beneficiary`.
+fn deploy_token(env: &Env, admin: &Address, beneficiary: &Address, amount: i128) -> Address {
+    use soroban_sdk::token::{StellarAssetClient, TokenClient};
+
+    let token_id = env.register_stellar_asset_contract(admin.clone());
+    env.mock_all_auths();
+
+    let token = TokenClient::new(env, &token_id);
+    if amount > 0 {
+        StellarAssetClient::new(env, &token_id).mint(beneficiary, &amount);
+    }
+    assert_eq!(token.balance(beneficiary), amount);
+    token_id
+}
+
+#[test]
+fn test_pay_settlement_transfers_tokens_onchain() {
+    use soroban_sdk::token::TokenClient;
+
+    let env = create_env();
+    let client = deploy(&env);
+    let owner = addr(&env);
+    let alice = addr(&env);
+    let token_admin = addr(&env);
+
+    let hh_id = client.create_household(&s(&env, "Apt"), &owner);
+    client.add_member(&hh_id, &owner, &alice, &s(&env, "Alice"));
+
+    // Alice holds 10_000 tokens; owner holds 0.
+    let token_id = deploy_token(&env, &token_admin, &alice, 10_000i128);
+
+    let sid = client.create_settlement(&hh_id, &alice, &owner, &5000i128, &s(&env, "XLM"));
+
+    // Inter-contract call: BillBuddy invokes the token contract to move funds.
+    client.pay_settlement(&hh_id, &sid, &alice, &token_id);
+
+    let token = TokenClient::new(&env, &token_id);
+    assert_eq!(token.balance(&alice), 5_000);
+    assert_eq!(token.balance(&owner), 5_000);
+
+    // Settlement is completed and has no balance impact on the ledger itself.
+    let settlement = client.get_settlement(&hh_id, &sid);
+    assert_eq!(settlement.status, SettlementStatus::Completed);
+}
+
+#[test]
+fn test_pay_settlement_transfers_full_balance() {
+    use soroban_sdk::token::TokenClient;
+
+    let env = create_env();
+    let client = deploy(&env);
+    let owner = addr(&env);
+    let bob = addr(&env);
+    let token_admin = addr(&env);
+
+    let hh_id = client.create_household(&s(&env, "Apt"), &owner);
+    client.add_member(&hh_id, &owner, &bob, &s(&env, "Bob"));
+
+    // Bob holds exactly the amount owed.
+    let token_id = deploy_token(&env, &token_admin, &bob, 7_500i128);
+
+    let sid = client.create_settlement(&hh_id, &bob, &owner, &7_500i128, &s(&env, "XLM"));
+    client.pay_settlement(&hh_id, &sid, &bob, &token_id);
+
+    let token = TokenClient::new(&env, &token_id);
+    assert_eq!(token.balance(&bob), 0);
+    assert_eq!(token.balance(&owner), 7_500);
+}
+
+#[test]
+fn test_pay_settlement_insufficient_balance_fails() {
+    let env = create_env();
+    let client = deploy(&env);
+    let owner = addr(&env);
+    let carol = addr(&env);
+    let token_admin = addr(&env);
+
+    let hh_id = client.create_household(&s(&env, "Apt"), &owner);
+    client.add_member(&hh_id, &owner, &carol, &s(&env, "Carol"));
+
+    // Carol only holds 100 tokens but owes 5_000.
+    let token_id = deploy_token(&env, &token_admin, &carol, 100i128);
+
+    let sid = client.create_settlement(&hh_id, &carol, &owner, &5_000i128, &s(&env, "XLM"));
+    let result = client.try_pay_settlement(&hh_id, &sid, &carol, &token_id);
+
+    // Token contract rejects the transfer → BillBuddy surfaces TokenTransferFailed.
+    assert_eq!(
+        result.err().unwrap().unwrap(),
+        ContractError::TokenTransferFailed
+    );
+
+    // Settlement is still pending — nothing moved on-chain.
+    let settlement = client.get_settlement(&hh_id, &sid);
+    assert_eq!(settlement.status, SettlementStatus::Pending);
+}
+
+#[test]
+fn test_pay_settlement_wrong_payer_fails() {
+    use soroban_sdk::token::TokenClient;
+
+    let env = create_env();
+    let client = deploy(&env);
+    let owner = addr(&env);
+    let alice = addr(&env);
+    let mallory = addr(&env);
+    let token_admin = addr(&env);
+
+    let hh_id = client.create_household(&s(&env, "Apt"), &owner);
+    client.add_member(&hh_id, &owner, &alice, &s(&env, "Alice"));
+
+    let token_id = deploy_token(&env, &token_admin, &alice, 10_000i128);
+    let sid = client.create_settlement(&hh_id, &alice, &owner, &5_000i128, &s(&env, "XLM"));
+
+    // Mallory (not the payer) cannot settle alice's debt.
+    let result = client.try_pay_settlement(&hh_id, &sid, &mallory, &token_id);
+    assert_eq!(
+        result.err().unwrap().unwrap(),
+        ContractError::UnauthorizedSettlement
+    );
+
+    let token = TokenClient::new(&env, &token_id);
+    assert_eq!(token.balance(&alice), 10_000); // untouched
+}
+
+#[test]
+fn test_pay_settlement_already_completed_fails() {
+    let env = create_env();
+    let client = deploy(&env);
+    let owner = addr(&env);
+    let alice = addr(&env);
+    let token_admin = addr(&env);
+
+    let hh_id = client.create_household(&s(&env, "Apt"), &owner);
+    client.add_member(&hh_id, &owner, &alice, &s(&env, "Alice"));
+
+    let token_id = deploy_token(&env, &token_admin, &alice, 10_000i128);
+    let sid = client.create_settlement(&hh_id, &alice, &owner, &5_000i128, &s(&env, "XLM"));
+
+    client.pay_settlement(&hh_id, &sid, &alice, &token_id);
+    let result = client.try_pay_settlement(&hh_id, &sid, &alice, &token_id);
+    assert_eq!(
+        result.err().unwrap().unwrap(),
+        ContractError::SettlementAlreadyCompleted
+    );
+}
+
+#[test]
+fn test_get_token_balance_inter_contract_read() {
+    let env = create_env();
+    let client = deploy(&env);
+    let owner = addr(&env);
+    let dave = addr(&env);
+    let token_admin = addr(&env);
+
+    let hh_id = client.create_household(&s(&env, "Apt"), &owner);
+    client.add_member(&hh_id, &owner, &dave, &s(&env, "Dave"));
+
+    let token_id = deploy_token(&env, &token_admin, &dave, 4_200i128);
+
+    // Read-only inter-contract call returns the token contract's balance.
+    let balance = client.get_token_balance(&dave, &token_id);
+    assert_eq!(balance, 4_200);
+
+    // Non-participant address reads 0 from the same token contract.
+    let stranger = addr(&env);
+    assert_eq!(client.get_token_balance(&stranger, &token_id), 0);
+}
