@@ -1,0 +1,8 @@
+node_modules
+apps/web/node_modules
+contracts/billbuddy/target
+contracts/**/target
+.git
+.github
+dist
+apps/web/dist

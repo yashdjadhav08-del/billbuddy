@@ -14,8 +14,9 @@ _Watch the BillBuddy demo on Google Drive:_ https://drive.google.com/file/d/1UUo
 
 ## Deployment
 
-<!-- Add your Vercel / Netlify URL here -->
-https://your-deployment-url.example
+[![Vercel Deployment](https://img.shields.io/badge/Deployed%20on-Vercel-black?logo=vercel)](https://web-three-tawny-90.vercel.app)
+
+**Live dApp URL:** [https://web-three-tawny-90.vercel.app](https://web-three-tawny-90.vercel.app)
 
 ---
 
