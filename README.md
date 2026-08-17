@@ -1,5 +1,17 @@
 # BillBuddy
 
+<p align="center">
+  <a href="https://github.com/yashdjadhav08-del/billbuddy/actions/workflows/ci.yml"><img src="https://github.com/yashdjadhav08-del/billbuddy/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+  <a href="https://web-three-tawny-90.vercel.app"><img src="https://img.shields.io/badge/Vercel-Live%20dApp-000000?logo=vercel&logoColor=white" alt="Vercel Deployment" /></a>
+  <a href="https://stellar.expert/explorer/testnet/contract/CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL"><img src="https://img.shields.io/badge/Stellar-Testnet-14B6EB?logo=stellar&logoColor=white" alt="Stellar Testnet" /></a>
+  <a href="https://stellar.org/soroban"><img src="https://img.shields.io/badge/Soroban-Smart%20Contracts-7D00FF" alt="Soroban" /></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-2021-DEA584?logo=rust&logoColor=white" alt="Rust" /></a>
+  <a href="https://reactjs.org/"><img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.3-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  <a href="https://vitejs.dev/"><img src="https://img.shields.io/badge/Vite-5.0-646CFF?logo=vite&logoColor=white" alt="Vite" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
+</p>
+
 A production-quality decentralized household expense splitting dApp built on Stellar/Soroban. Households track shared bills, calculate net balances using smart-contract logic, and settle payments with real on-chain XLM transfers.
 
 ---
