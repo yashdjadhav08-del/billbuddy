@@ -6,10 +6,9 @@ A production-quality decentralized household expense splitting dApp built on Ste
 
 ## Demo Video
 
-<!-- Add your demo video link here -->
-_BillBuddy Demo_
+[![BillBuddy Demo](https://img.shields.io/badge/Demo%20Video-Watch-blue)](https://drive.google.com/file/d/1UUoQgIHksqRcVNydOCAE59FXHgLMT-_o/view?usp=sharing)
 
-<!-- Watch the full demo: https://youtu.be/… -->
+_Watch the BillBuddy demo on Google Drive:_ https://drive.google.com/file/d/1UUoQgIHksqRcVNydOCAE59FXHgLMT-_o/view?usp=sharing
 
 ---
 
