@@ -111,7 +111,7 @@ pages/
 ### Run the Frontend
 
 ```bash
-git clone https://github.com/your-org/billbuddy.git
+git clone https://github.com/yashdjadhav08-del/billbuddy.git
 cd billbuddy
 npm install --workspace=apps/web
 cp .env.example apps/web/.env.local
@@ -133,7 +133,25 @@ Mock mode is a developer-only fallback — it is never the source of truth.
 
 ## Screenshots
 
-<!-- Add screenshots here later -->
+### 1. Settlements & Balances
+Track net balances across household members and settle up instantly with real on-chain transfers.
+
+![Settlements View](docs/screenshots/settlements.png)
+
+### 2. Create & Split Bills
+Flexible expense splitting with equal, custom, or percentage allocations directly calculated on-chain.
+
+![Add Bill](docs/screenshots/add-bill.png)
+
+### 3. On-Chain Settlement on StellarExpert
+Real-time verifiable settlement transaction on Stellar Testnet moving native XLM.
+
+![StellarExpert Transaction](docs/screenshots/stellar-expert-tx.png)
+
+### 4. Continuous Integration (GitHub Actions)
+Full CI pipeline running linting, type-checking, Vitest suite, Soroban contract tests, and WASM compilation.
+
+![GitHub Actions CI Pipeline](docs/screenshots/ci-pipeline.png)
 
 ---
 
