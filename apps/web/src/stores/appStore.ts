@@ -24,6 +24,8 @@ interface AppActions {
   updateSettlement: (settlement: Settlement) => void
   setLoading: (loading: boolean) => void
   setLastSynced: (ts: number) => void
+  /** Request an immediate sync refresh (called after on-chain operations) */
+  triggerSync: () => void
   /** Recompute balances and optimal transfer plan from current state */
   recomputeBalances: () => void
   reset: () => void
@@ -84,6 +86,10 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       setLoading: isLoading => set({ isLoading }),
 
       setLastSynced: ts => set({ lastSynced: ts }),
+
+      triggerSync: () => {
+        set({ lastSynced: Date.now() })
+      },
 
       recomputeBalances: () => {
         const { household, bills, settlements } = get()

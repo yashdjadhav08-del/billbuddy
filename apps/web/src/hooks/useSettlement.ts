@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import type { SettlementTransfer, TxState } from '@/types'
 
 export function useSettlement() {
-  const { household, addSettlement, updateSettlement, setLoading } = useAppStore()
+  const { household, addSettlement, updateSettlement, setLoading, triggerSync } = useAppStore()
   const { requireWallet } = useWallet()
   const [txState, setTxState] = useState<TxState>({ status: 'idle', hash: null, error: null })
 
@@ -66,6 +66,7 @@ export function useSettlement() {
 
         setTxState({ status: 'success', hash: txHash, error: null })
         toast.success('Settlement completed!')
+        triggerSync()
         return { settlement: completed, txHash }
       } catch (err) {
         const msg = friendlyContractError(err)
@@ -126,6 +127,7 @@ export function useSettlement() {
 
         setTxState({ status: 'success', hash: txHash, error: null })
         toast.success('Money sent!')
+        triggerSync()
         return { txHash }
       } catch (err) {
         const msg = friendlyContractError(err)
