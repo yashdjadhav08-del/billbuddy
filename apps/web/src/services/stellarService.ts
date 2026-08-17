@@ -79,8 +79,13 @@ class StellarService {
       const msg = String(err)
       if (msg.includes('404') || msg.includes('Not Found')) {
         throw new Error(
-          `Account ${address.slice(0, 8)}… not found on Testnet. ` +
-          'Fund it at https://friendbot.stellar.org/?addr=' + encodeURIComponent(address),
+          `Account ${address.slice(0, 8)}… not found on ${config.stellar.network}. ` +
+          `Fund it at https://friendbot.stellar.org/?addr=` + encodeURIComponent(address),
+        )
+      }
+      if (msg.includes('timeout') || msg.includes('ECONNABORTED') || msg.includes('network')) {
+        throw new Error(
+          'Network error connecting to Stellar. Please check your connection and try again.',
         )
       }
       throw err
