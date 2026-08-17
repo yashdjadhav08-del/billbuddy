@@ -188,6 +188,18 @@ Copy the returned contract ID into `apps/web/.env.local`:
 VITE_SOROBAN_CONTRACT_ID=CXXXXX...
 ```
 
+### Deployed contract (Stellar Testnet)
+
+The BillBuddy Soroban contract is currently deployed to **Testnet** at:
+
+```env
+VITE_SOROBAN_CONTRACT_ID=CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL
+```
+
+View it on the explorer: [stellar.expert – BillBuddy contract](https://stellar.expert/explorer/testnet/contract/CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL)
+
+> Note: the contract ID changes if you redeploy. Keep `apps/web/.env.local` in sync with your latest deployment.
+
 ---
 
 ## Testnet Wallet Setup
