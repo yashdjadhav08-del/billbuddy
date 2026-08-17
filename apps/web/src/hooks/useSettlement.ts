@@ -96,7 +96,7 @@ export function useSettlement() {
         setLoading(false)
       }
     },
-    [household, requireWallet, addSettlement, updateSettlement, setLoading],
+    [household, requireWallet, addSettlement, updateSettlement, setLoading, triggerSync],
   )
 
   /**
@@ -141,7 +141,7 @@ export function useSettlement() {
         throw err
       }
     },
-    [household, requireWallet],
+    [household, requireWallet, triggerSync],
   )
 
   const closePeriod = useCallback(
@@ -162,7 +162,7 @@ export function useSettlement() {
         setLoading(false)
       }
     },
-    [household, requireWallet, setLoading],
+    [household, requireWallet, setLoading, triggerSync],
   )
 
   return { settleTransfer, sendTransfer, closePeriod, txState, resetTx }
