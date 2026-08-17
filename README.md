@@ -153,6 +153,13 @@ Full CI pipeline running linting, type-checking, Vitest suite, Soroban contract 
 
 ![GitHub Actions CI Pipeline](https://github.com/yashdjadhav08-del/billbuddy/releases/download/v1.0.0/ci-pipeline.png)
 
+### 5. Mobile Responsive UI
+Fully responsive mobile experience with clean touch navigation and Freighter wallet integration.
+
+<p align="center">
+  <img src="https://github.com/yashdjadhav08-del/billbuddy/releases/download/v1.0.0/mobile-view.jpg" alt="Mobile Responsive UI" width="320" />
+</p>
+
 ---
 
 ## Environment Variables (`apps/web/.env.local`)
