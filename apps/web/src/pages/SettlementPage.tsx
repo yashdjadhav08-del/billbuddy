@@ -55,7 +55,7 @@ function TxProgressModal({
     : txState.status === 'idle'
     ? 0
     : Math.round(((currentStep + 1) / TX_STEPS.length) * 90)
-  const isManual = transfer && !transfer.fromName
+  const isManual = transfer && transfer.to && transfer.amount && !transfer.fromName
 
   return (
     <Dialog open={open} onOpenChange={open => !open && txState.status !== 'signing' && txState.status !== 'submitting' && txState.status !== 'confirming' && onClose()}>
