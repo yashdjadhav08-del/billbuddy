@@ -119,3 +119,25 @@ pub fn settlement_failed(env: &Env, household_id: u64, settlement_id: u64) {
     );
     env.events().publish(topics, ());
 }
+
+/// Emitted after an on-chain (inter-contract) token transfer settles a payment.
+/// `token_contract` is the SAC / token contract that moved the funds.
+pub fn settlement_transferred(
+    env: &Env,
+    household_id: u64,
+    settlement_id: u64,
+    payer: &Address,
+    receiver: &Address,
+    amount: i128,
+    token_contract: &Address,
+) {
+    let topics = (
+        Symbol::new(env, "SettlementTransferred"),
+        household_id,
+        settlement_id,
+        payer.clone(),
+        receiver.clone(),
+    );
+    env.events()
+        .publish((topics,), (amount, token_contract.clone()));
+}

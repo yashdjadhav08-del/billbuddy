@@ -225,6 +225,27 @@ impl BillBuddyContract {
         settlement::fail_settlement(&env, household_id, settlement_id, payer)
     }
 
+    /// Settle a payment on-chain by transferring tokens through the given
+    /// token (Stellar Asset) contract. Inter-contract call: BillBuddy invokes
+    /// `transfer` on the token contract, moving funds atomically with recording
+    /// the settlement as completed.
+    pub fn pay_settlement(
+        env: Env,
+        household_id: u64,
+        settlement_id: u64,
+        payer: Address,
+        token_contract: Address,
+    ) -> Result<(), ContractError> {
+        payer.require_auth();
+        settlement::pay_settlement(&env, household_id, settlement_id, payer, token_contract)
+    }
+
+    /// Read a member's balance from a token (Stellar Asset) contract.
+    /// Read-only inter-contract call.
+    pub fn get_token_balance(env: Env, account: Address, token_contract: Address) -> i128 {
+        settlement::get_token_balance(&env, account, token_contract)
+    }
+
     /// Get a settlement by ID.
     pub fn get_settlement(
         env: Env,

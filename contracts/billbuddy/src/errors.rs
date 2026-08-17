@@ -37,6 +37,8 @@ pub enum ContractError {
     UnauthorizedSettlement = 403,
     SettlementAmountMismatch = 404,
     DuplicateSettlement = 405,
+    TokenTransferFailed = 406,
+    TokenContractRequired = 407,
 
     // Generic errors (9xx)
     InternalError = 900,

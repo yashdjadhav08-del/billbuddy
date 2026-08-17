@@ -2,6 +2,7 @@ use crate::errors::ContractError;
 use crate::events;
 use crate::storage;
 use crate::types::*;
+use soroban_sdk::token::TokenClient;
 use soroban_sdk::{Address, Env, String};
 
 pub fn create_settlement(
@@ -110,4 +111,68 @@ pub fn fail_settlement(
 
     events::settlement_failed(env, household_id, settlement_id);
     Ok(())
+}
+
+// ─── Inter-contract communication ────────────────────────────────────────────
+//
+// BillBuddy talks to a Stellar Asset Contract (SAC) / token contract on-chain.
+// Instead of only *recording* that a payment happened (like the Classic
+// payment path does), `pay_settlement` makes the token contract actually move
+// funds between members within a single Soroban transaction.
+
+/// Settle a pending settlement by transferring tokens on-chain through the
+/// given token (Stellar Asset) contract. Inter-contract call: this contract
+/// invokes `transfer(from, to, amount)` on the token contract, which
+/// authenticates the payer and moves the funds atomically with this call.
+pub fn pay_settlement(
+    env: &Env,
+    household_id: u64,
+    settlement_id: u64,
+    payer: Address,
+    token_contract: Address,
+) -> Result<(), ContractError> {
+    let mut settlement = storage::get_settlement(env, household_id, settlement_id)?;
+
+    if settlement.payer != payer {
+        return Err(ContractError::UnauthorizedSettlement);
+    }
+
+    match settlement.status {
+        SettlementStatus::Completed => return Err(ContractError::SettlementAlreadyCompleted),
+        SettlementStatus::Failed => return Err(ContractError::SettlementAlreadyFailed),
+        _ => {}
+    }
+
+    // Inter-contract call: move the funds via the token contract.
+    // The token contract re-checks payer auth for (from, to, amount).
+    let client = TokenClient::new(env, &token_contract);
+    let result = client.try_transfer(&settlement.payer, &settlement.receiver, &settlement.amount);
+
+    // try_* returns Result<Result<T, _>, Result<_, InvokeError>>.
+    // Any Err layer means the token contract rejected the transfer.
+    if result.is_err() || result.as_ref().unwrap().is_err() {
+        return Err(ContractError::TokenTransferFailed);
+    }
+
+    settlement.status = SettlementStatus::Completed;
+    settlement.transaction_hash = String::from_str(env, "");
+    storage::save_settlement(env, &settlement);
+
+    events::settlement_transferred(
+        env,
+        household_id,
+        settlement_id,
+        &settlement.payer,
+        &settlement.receiver,
+        settlement.amount,
+        &token_contract,
+    );
+    Ok(())
+}
+
+/// Read-only inter-contract call: query a token (SAC) contract for an
+/// account's balance. Demonstrates reading state from another contract.
+pub fn get_token_balance(env: &Env, account: Address, token_contract: Address) -> i128 {
+    let client = TokenClient::new(env, &token_contract);
+    client.balance(&account)
 }
