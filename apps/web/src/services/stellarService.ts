@@ -133,7 +133,7 @@ class StellarService {
           amount: amountStr,
         }),
       )
-      .addMemo(params.memo ? Memo.text(params.memo.slice(0, 28)) : Memo.none())
+      .addMemo(params.memo ? Memo.text(String(params.memo).slice(0, 28)) : Memo.none())
       .setTimeout(300) // 5 minute window
       .build()
 
