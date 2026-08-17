@@ -1,126 +1,205 @@
 # BillBuddy
 
-**Split bills. Settle simply.**
-
-Track household expenses, calculate balances automatically, and settle with real Stellar payments.
+A production-quality decentralized household expense splitting dApp built on Stellar/Soroban. Households track shared bills, calculate net balances using smart-contract logic, and settle payments with real on-chain XLM transfers.
 
 ---
 
-## Overview
+## Demo Video
 
-BillBuddy solves one problem: after roommates share household expenses, who should pay whom, and exactly how much?
+<!-- Add your demo video link here -->
+_BillBuddy Demo_
 
-Every household bill is recorded with a flexible split (equal, custom, or percentage). BillBuddy calculates each member's net position and generates an optimized settlement plan — the minimum number of transfers to zero all balances. Settlements are signed through Freighter and submitted as real XLM payments on Stellar Testnet. The BillBuddy Soroban contract records each settlement and emits `SettlementCompleted` on-chain.
+<!-- Watch the full demo: https://youtu.be/… -->
+
+---
+
+## Deployment
+
+<!-- Add your Vercel / Netlify URL here -->
+https://your-deployment-url.example
+
+---
+
+## Live Contract (Stellar Testnet)
+
+| | |
+|---|---|
+| **Contract ID** | `CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL` |
+| **Network** | Stellar Testnet (Test SDF Network ; September 2015) |
+| **Explorer** | [View contract](https://stellar.expert/explorer/testnet/contract/CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL) |
+
+> The contract ID changes if you redeploy. Keep `apps/web/.env.local` in sync with your latest deployment.
 
 ---
 
 ## Features
 
-| Feature | Detail |
-|---|---|
-| Household management | Create a household, add/remove members by Stellar address |
-| Bill tracking | Rent, electricity, water, internet, groceries, streaming, maintenance |
-| Bill deletion | Remove a bill (creator or owner; settled bills locked) |
-| Flexible splits | Equal, custom amount, percentage (with live validation) |
-| Balance calculation | Integer-arithmetic net balances, conservation guaranteed |
-| Optimized settlements | Greedy minimum-transfer algorithm |
-| Freighter integration | Connect, sign, reject — no private keys ever touched |
-| Real Stellar payments | XLM payments on Testnet, real transaction hashes |
-| Soroban contract | Household + bill + settlement state, authorization enforced |
-| Contract events | `HouseholdCreated`, `BillCreated`, `SettlementCompleted`, etc. |
-| State sync | 15-second polling + visibility-change resync |
-| Monthly close | Lock period once all balances reach zero |
-| Mock mode | `VITE_MOCK_MODE=true` for local UI development without a deployed contract |
+- **Households** — Create shared spaces; the owner is added automatically as the first member
+- **Members** — Add/remove members by Stellar public address (owner-only, on-chain authorization)
+- **Bills** — Record shared expenses with equal, custom, or percentage splits; all amounts in stroops (bigint)
+- **Balances** — Real-time on-chain calculation; net per member across all active bills and completed settlements
+- **Settlements** — Two-step: `create_settlement` records intent → `complete_settlement` stores the transfer; plus `pay_settlement`, an on-chain transfer via inter-contract call to the native SAC
+- **Events** — Soroban RPC event polling; all activity shown in the Activity feed
+- **Freighter** — Non-custodial wallet; private keys never leave the browser extension
+- **Responsive** — Mobile-first Tailwind CSS layout
 
 ---
 
 ## Architecture
 
 ```
-Browser
-  │
-  ├─ React + Vite + Tailwind (mobile-first)
-  │    ├─ Zustand stores (wallet, app state)
-  │    ├─ TanStack Query (server state)
-  │    └─ react-hot-toast (notifications)
-  │
-  ├─ Freighter Wallet
-  │    └─ Signs transactions — never sees private keys
-  │
-  ├─ walletService      → Freighter API wrapper
-  ├─ stellarService     → Build / submit / confirm XLM payments
-  └─ contractService    → Soroban RPC calls (+ mock mode)
-          │
-          ▼
-  Stellar Testnet (Horizon + Soroban RPC)
-          │
-          ▼
-  BillBuddy Soroban Contract (Rust)
-          │
-          ├─ Household State
-          ├─ Member State
-          ├─ Bill State   (shares + contributions)
-          ├─ Balance logic (on-chain net balance)
-          └─ Settlement State Machine
-               Pending → Submitted → Completed | Failed
+Frontend (React/TypeScript/Vite)
+  └─ Freighter API v2           — wallet signing
+  └─ @stellar/stellar-sdk v16   — XDR building, Soroban RPC, Horizon
+  └─ Soroban RPC                — simulate, submit, poll, events
+       └─ BillBuddy Contract    — Soroban/Rust on Stellar Testnet
+            └─ XLM SAC          — native token, inter-contract transfer
 ```
 
----
+### Contract (`contracts/billbuddy/src/`)
 
-## Prerequisites
+| File | Purpose |
+|---|---|
+| `lib.rs` | 22 public functions: `create_household`, `add_member`, `remove_member`, `create_bill`, `update_bill`, `delete_bill`, `pay_bill`, `get_balance`, `get_all_balances`, `create_settlement`, `complete_settlement`, `pay_settlement`, `get_token_balance`, `close_period` + read functions |
+| `types.rs` | Soroban `contracttype` structs: `Household`, `Member`, `Bill`, `Settlement`, `MemberShare`, `MemberContribution`, `MemberBalance` |
+| `household.rs` | Household + member lifecycle logic |
+| `bills.rs` | Bill creation, validation, payment, auto-settle |
+| `balances.rs` | Net balance computation (conservation guaranteed) |
+| `settlement.rs` | Settlement state machine + inter-contract token transfer |
+| `storage.rs` | Persistent storage helpers with key composition |
+| `events.rs` | `env.events().publish()` for all state changes |
+| `errors.rs` | 40+ typed error codes |
 
-- Node.js ≥ 20
-- npm ≥ 10
-- Rust stable + `wasm32-unknown-unknown` target (for contract)
-- [Stellar CLI](https://developers.stellar.org/docs/tools/developer-tools/cli/install-cli) (`stellar`)
-- [Freighter browser extension](https://www.freighter.app)
+**Inter-contract communication:** `pay_settlement` calls
+`soroban_sdk::token::TokenClient::transfer` on the native XLM SAC contract —
+a real cross-contract call that moves funds atomically with recording the
+settlement. `get_token_balance` demonstrates read-only cross-contract queries.
+
+### Frontend (`apps/web/src/`)
+
+```
+services/
+  contractService.ts   — Soroban contract client (XDR building, mock-mode fallback)
+  sorobanScVal.ts      — ScVal encoding/decoding helpers
+  stellarService.ts    — build / submit / confirm XLM payments via Horizon
+  walletService.ts     — Freighter API wrapper
+  activityService.ts   — Soroban RPC event parsing for the Activity feed
+  mockServerClient.ts  — shared mock-state server client (dev/demo mode)
+hooks/
+  useWallet.ts         — Freighter connection state, network checks
+  useHousehold.ts      — household CRUD + `syncHousehold` (poll-refresh)
+  useBill.ts           — bill creation / payment flows
+  useSettlement.ts     — two-phase settlement + transfer + period close
+  useSync.ts           — 15 s polling + visibility resync + trigger-sync
+  useDiscovery.ts      — participant bill discovery across households
+pages/
+  Dashboard, CreateBill, BillDetails, Household, Settlement, MonthlyClose, Landing
+ Stores (Zustand) — walletStore, appStore, activityStore
+```
 
 ---
 
 ## Local Setup
 
-### 1. Clone and install
+**Prerequisites**
+
+- Node.js 20+
+- Rust stable with `wasm32-unknown-unknown` target: `rustup target add wasm32-unknown-unknown`
+- Stellar CLI 22+
+- Freighter Wallet browser extension
+
+### Run the Frontend
 
 ```bash
 git clone https://github.com/your-org/billbuddy.git
 cd billbuddy
 npm install --workspace=apps/web
+cp .env.example apps/web/.env.local
+# .env already contains the live contract ID — no changes needed for testnet
+npm run dev --workspace=apps/web
+# Open http://localhost:5173/
 ```
 
-### 2. Configure environment
+To develop without a deployed contract, set `VITE_MOCK_MODE=true` and run the
+shared mock-state server:
 
 ```bash
-cp .env.example apps/web/.env.local
+node mock-server.mjs
 ```
 
-Edit `apps/web/.env.local`:
+Mock mode is a developer-only fallback — it is never the source of truth.
+
+---
+
+## Screenshots
+
+<!-- Add screenshots here later -->
+
+---
+
+## Environment Variables (`apps/web/.env.local`)
 
 ```env
 VITE_STELLAR_NETWORK=testnet
-VITE_SOROBAN_CONTRACT_ID=<your-deployed-contract-id>
+VITE_STELLAR_HORIZON_URL=https://horizon-testnet.stellar.org
+VITE_SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+VITE_STELLAR_NETWORK_PASSPHRASE=Test SDF Network ; September 2015
+VITE_SOROBAN_CONTRACT_ID=CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL
+VITE_ASSET_CONTRACT_ID=
 VITE_ASSET_CODE=XLM
-VITE_MOCK_MODE=false          # set true for UI-only development
+VITE_ASSET_ISSUER=
+VITE_EXPLORER_BASE_URL=https://stellar.expert/explorer/testnet
+VITE_MOCK_MODE=false
 ```
 
-### 3. Run the frontend
+Never put secret keys in `.env`. `.env` is gitignored.
+
+---
+
+## Wallet Setup
+
+1. Install [Freighter](https://www.freighter.app) browser extension
+2. Create or import a wallet
+3. Switch to **Testnet** in Freighter settings
+4. Fund your wallet: `https://friendbot.stellar.org/?addr=YOUR_STELLAR_ADDRESS`
+   (grants 10,000 XLM on Testnet)
+
+---
+
+## Running Tests
 
 ```bash
-npm run dev --workspace=apps/web
-# → http://localhost:5173
+# Frontend (Vitest)
+cd apps/web && npm test
+
+# Contract (Soroban testutils)
+cd contracts/billbuddy && cargo test --features testutils   # 39/39 pass
+
+# TypeScript
+cd apps/web && npm run typecheck
+
+# Lint
+cd apps/web && npm run lint
+
+# Mock server
+node --test mock-server.test.mjs
 ```
 
-To develop without a deployed contract, set `VITE_MOCK_MODE=true`.
-This is a developer-only fallback — it is never used as the source of truth.
-
-### 4. Deploy the contract (one command)
+### Build WASM
 
 ```bash
-./scripts/deploy-contract.sh
+cd contracts/billbuddy
+cargo build --target wasm32-unknown-unknown --release
+# Output: target/wasm32-unknown-unknown/release/billbuddy.wasm
 ```
 
-This builds, funds a deployer via Friendbot, deploys to Testnet and writes the
-contract ID into `apps/web/.env.local`. (Requires `stellar-cli` and a built WASM —
-see *Contract Deployment* below.)
+### Build Frontend for Production
+
+```bash
+cd apps/web
+npm run build
+# Output: apps/web/dist/
+```
 
 ---
 
@@ -135,11 +214,8 @@ rustup target add wasm32-unknown-unknown
 ### 2. Install Stellar CLI
 
 ```bash
-# macOS / Linux
 cargo install --locked stellar-cli --features opt
-
-# Or via homebrew
-brew install stellar/tap/stellar-cli
+# or: brew install stellar/tap/stellar-cli
 ```
 
 ### 3. Build the contract
@@ -147,11 +223,6 @@ brew install stellar/tap/stellar-cli
 ```bash
 cd contracts/billbuddy
 cargo build --target wasm32-unknown-unknown --release
-```
-
-The WASM is at:
-```
-target/wasm32-unknown-unknown/release/billbuddy.wasm
 ```
 
 ### 4. Configure Stellar CLI for Testnet
@@ -166,15 +237,17 @@ stellar network add testnet \
 
 ```bash
 stellar keys generate deployer --network testnet
-stellar keys address deployer
-```
-
-Fund it:
-```bash
 curl "https://friendbot.stellar.org/?addr=$(stellar keys address deployer)"
 ```
 
-### 6. Deploy
+### 6. Deploy (one command)
+
+```bash
+./scripts/deploy-contract.sh
+```
+
+The script builds, funds a deployer via Friendbot, deploys to Testnet, and
+writes the returned contract ID into `apps/web/.env.local`. Or manually:
 
 ```bash
 stellar contract deploy \
@@ -183,218 +256,87 @@ stellar contract deploy \
   --network testnet
 ```
 
-Copy the returned contract ID into `apps/web/.env.local`:
-```env
-VITE_SOROBAN_CONTRACT_ID=CXXXXX...
-```
-
-### Deployed contract (Stellar Testnet)
-
-The BillBuddy Soroban contract is currently deployed to **Testnet** at:
-
-```env
-VITE_SOROBAN_CONTRACT_ID=CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL
-```
-
-View it on the explorer: [stellar.expert – BillBuddy contract](https://stellar.expert/explorer/testnet/contract/CCIR37QUJLJJNROTEVQMPH3SJ6W2VEBZNKJHMGEPDLDYVZ7JWBVQGWFL)
-
-> Note: the contract ID changes if you redeploy. Keep `apps/web/.env.local` in sync with your latest deployment.
-
 ---
 
-## Testnet Wallet Setup
+## Settlement Flow
 
-### Install Freighter
+Settlement is a deliberate multi-step process that moves **real XLM**:
 
-1. Install [Freighter](https://www.freighter.app) browser extension.
-2. Create or import a wallet.
-3. Switch to **Testnet** in Freighter settings.
+1. **`create_settlement`** — records the intent on-chain (signed Soroban tx), returns a settlement ID. Does **not** transfer XLM.
+2. **Freighter XLM payment** — `stellarService.buildAndSignPayment` builds a Stellar Classic payment, signed in Freighter, submitted and confirmed on Horizon.
+3. **`complete_settlement`** — stores the real transaction hash on-chain (signed Soroban tx).
 
-### Fund your account
+Or the fully on-chain path: **`pay_settlement`** performs the XLM transfer via
+`soroban_sdk::token::TokenClient::transfer` (inter-contract call to the XLM SAC)
+and marks the settlement completed in a single Soroban transaction.
 
-Open the Stellar Friendbot URL in your browser:
-```
-https://friendbot.stellar.org/?addr=YOUR_STELLAR_ADDRESS
-```
-
-Or via curl:
-```bash
-curl "https://friendbot.stellar.org/?addr=GYOUR_ADDRESS_HERE"
-```
-
-This gives you **10,000 XLM** on Testnet.
-
-### Verify on Explorer
-
-```
-https://stellar.expert/explorer/testnet/account/YOUR_ADDRESS
-```
-
----
-
-## Asset / Payment Design
-
-BillBuddy uses **native XLM** as the settlement asset for simplicity and trustlessness.
-
-- No issuer, no trustline required
-- Available on every Testnet account via Friendbot
-- 1 cent (minor unit) = 1 stroop = 0.0000001 XLM
-
-The Soroban contract records settlement metadata (payer, receiver, amount, tx hash).
-The actual XLM transfer is a standard Stellar Classic payment operation, signed by Freighter.
-
-To use a custom asset (e.g., USDC), set `VITE_ASSET_CODE` and `VITE_ASSET_ISSUER` and ensure all household members have the required trustline.
-
----
-
-## Running Tests
-
-### Frontend unit tests
-
-```bash
-cd apps/web
-npm test
-# Runs: money, balance, settlement optimizer, split validator, contractService
-```
-
-From the repo root, `npm test` runs both the frontend suite and the mock-server
-tests (`node --test mock-server.test.mjs`).
-
-### Frontend type-check
-
-```bash
-npm run typecheck --workspace=apps/web
-```
-
-### Frontend lint
-
-```bash
-npm run lint --workspace=apps/web
-```
-
-### Rust contract tests
-
-```bash
-cd contracts/billbuddy
-cargo test --features testutils   # testutils enables the test contract harness
-```
-
-### Rust format + lint
-
-```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-```
-
-### Build WASM
-
-```bash
-cargo build --target wasm32-unknown-unknown --release
-```
-
----
-
-## CI/CD
-
-GitHub Actions runs on every push to `main` and every pull request.
-
-**Jobs:**
-- `frontend` — lint, typecheck, vitest, vite build
-- `contract` — rustfmt, clippy, `cargo test --features testutils`, wasm build
-- `mock-server` — `node --test` for the shared mock-state server
-- `all-checks` — gate requiring all three jobs to pass
-
-See `.github/workflows/ci.yml`.
-
-**Required secrets:** none for CI checks (uses mock mode). For deployment automation, add:
-- `STELLAR_DEPLOYER_SECRET` — deployer account secret key (server-side only, never in `.env`)
-
----
-
-## Project Structure
-
-```
-billbuddy/
-├── apps/
-│   └── web/                     # React / Vite frontend
-│       └── src/
-│           ├── components/
-│           │   ├── ui/          # Design system (button, card, dialog…)
-│           │   ├── layout/      # AppLayout, TopBar, BottomNav
-│           │   └── wallet/      # WalletButton
-│           ├── pages/           # Route-level components
-│           ├── hooks/           # useWallet, useHousehold, useBill…
-│           ├── lib/             # money, balance, settlement, split
-│           ├── services/        # walletService, stellarService, contractService
-│           ├── stores/          # Zustand: walletStore, appStore
-│           ├── types/           # All domain TypeScript types
-│           ├── config/          # env.ts
-│           └── test/            # Vitest unit tests
-│
-├── contracts/
-│   └── billbuddy/               # Soroban smart contract (Rust)
-│       └── src/
-│           ├── lib.rs           # Contract entry point
-│           ├── types.rs         # All Soroban types
-│           ├── household.rs     # Household + member logic
-│           ├── bills.rs         # Bill creation + validation
-│           ├── balances.rs      # Net balance calculation
-│           ├── settlement.rs    # Settlement state machine
-│           ├── storage.rs       # Persistent storage helpers
-│           ├── events.rs        # Contract event emitters
-│           └── errors.rs        # ContractError enum
-│       └── tests/
-│           └── integration_tests.rs
-│
-├── docs/
-│   ├── architecture.md
-│   ├── contract.md
-│   ├── deployment.md
-│   └── demo.md
-│
-├── mock-server.mjs            # shared mock-state server (dev/demo mode)
-├── mock-server.test.mjs       # server tests (node --test)
-├── .github/workflows/ci.yml
-├── .env.example
-└── README.md
-```
+The UI shows a 5-step progress state machine: **Building → Signing → Submitting → Confirming → Confirmed**.
 
 ---
 
 ## Known Limitations
 
-1. **Single-period model**: The current contract tracks one active period per household. Multi-period history requires additional contract storage.
+- Testnet only (no mainnet deployment)
+- No multi-currency support (XLM only)
+- No recurring expenses
+- Single-period model per household (multi-period history requires more storage)
+- Event indexing uses 15-second RPC polling; a production app could use Stellar event streaming or an indexer
+- Mobile Freighter depends on Freighter's mobile app / WalletConnect
+- Contract state is not paginated (households/bills fetched individually)
 
-2. **Asset**: Uses native XLM. Custom SAC (Stellar Asset Contract) token support is architected but not wired through the Soroban contract call path.
+---
 
-3. **Event indexing**: State sync uses 15-second polling via Horizon + Soroban RPC `getEvents`. A production app could use Stellar's event streaming or a lightweight indexer.
+## Security
 
-4. **Mode flags**: `VITE_MOCK_MODE=true` is an explicit, developer-only UI fallback. In real mode (`VITE_MOCK_MODE=false`) every mutation is a signed Soroban transaction and settlement payments move real Testnet XLM. Mock mode is never the source of truth.
+- No private keys in source code or `.env` files
+- Freighter handles all signing client-side
+- All authorization enforced by Soroban contract (`require_auth()`)
+- Frontend authorization checks are UX only — never replace contract security
+- `.gitignore` excludes `.env`, `dist/`, `target/`, `node_modules/`
 
-5. **Mobile wallet**: Freighter is primarily a browser extension. Mobile wallet support depends on Freighter's mobile app or WalletConnect integration.
+---
 
-## Two-Wallet Flow (what actually happens)
+## CI/CD
 
-1. **Wallet A** connects, creates a household. The Soroban transaction is signed in Freighter and confirms on Testnet.
-2. **Wallet A** adds **Wallet B** by Stellar address → on-chain `add_member` transaction.
-3. **Wallet A** creates a bill → on-chain `create_bill` transaction with shares + contributions. Balances live in the contract.
-4. **Wallet B** opens the app in a different browser, connects → the app discovers the household via `get_household`/`get_members` and loads the same on-chain bills instantly. No localStorage copying.
-5. **Wallet B** sees "You owe" → taps Pay → contract `create_settlement` (signed) → real XLM payment built by `stellarService`, signed by Freighter, submitted and confirmed → contract `complete_settlement` stores the transaction hash.
-6. Both wallets poll the contract every 15 seconds and read Soroban contract events (`BillCreated`, `SettlementCompleted`, ...) which drive the Activity feed. No reload needed.
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push / pull request:
+
+- **Frontend** — lint → typecheck → test → build
+- **Contract** — fmt → clippy (−D warnings) → test → WASM build
+- **Mock server** — `node --test`
+- **`all-checks`** — gate requiring all jobs to pass
+
+Artifacts: `web-dist` and `contract-wasm` uploaded on `main`.
+
+Required secrets: none for CI checks (uses mock mode).
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Smart Contract | Rust, Soroban SDK 20.x, `wasm32-unknown-unknown` |
+| Frontend Framework | React 18, TypeScript 5.3, Vite 5 |
+| UI | Radix UI, Tailwind CSS, Lucide icons |
+| State | Zustand, TanStack Query, react-hot-toast |
+| Wallet | Freighter API v2 |
+| Blockchain SDK | `@stellar/stellar-sdk` v16 |
+| Testing | Vitest (frontend), Soroban testutils (contract) |
+| CI/CD | GitHub Actions |
+| Deployment | Vercel / Netlify (frontend) |
 
 ---
 
 ## Demo Steps
 
-See `docs/demo.md` for the full 1-minute demo script.
+See `docs/demo.md` for the full demo script. Quick version:
 
-**Quick version:**
 1. Open the app, connect Freighter (Testnet)
-2. Open Apartment 204 → see August 2026 bills
-3. Add Internet $30 → 4-way split → balances update instantly
-4. Go to Settlements → click **Settle with Stellar**
-5. Freighter opens → sign
-6. Watch the 5-step progress: Building → Signing → Submitting → Confirming → ✓
-7. Real transaction hash appears with explorer link
+2. Open your household → see the current period's bills
+3. Add a bill with a custom split → balances update instantly
+4. Go to Settlements → click **Settle**
+5. Freighter opens → sign each step
+6. Watch the progress: Building → Signing → Submitting → Confirming → ✓
+7. A real transaction hash appears with explorer link
 8. Return to dashboard → outstanding = $0
-9. Monthly Close → 🎉 August is settled!
+9. Monthly Close → 🎉 period settled
