@@ -19,7 +19,7 @@ export function useSync() {
   const { household } = useAppStore()
   const { syncHousehold } = useHousehold()
   const publicKey = useWalletStore(s => s.publicKey)
-  const lastSynced = useAppStore(s => s.lastSynced)
+  const syncTick = useAppStore(s => s.syncTick)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const syncRef = useRef(syncHousehold)
@@ -27,14 +27,16 @@ export function useSync() {
 
   const householdId = household?.id
 
-  // Immediate sync trigger (called after on-chain operations like transfers)
-  const prevSynced = useRef(lastSynced)
+  // Immediate sync trigger (called after on-chain operations like transfers).
+  // Watches syncTick (a counter) instead of lastSynced so that a finished sync
+  // updating lastSynced never re-triggers an endless refresh loop.
+  const prevTick = useRef(syncTick)
   useEffect(() => {
-    if (householdId && lastSynced && lastSynced !== prevSynced.current) {
-      prevSynced.current = lastSynced
+    if (householdId && syncTick !== prevTick.current) {
+      prevTick.current = syncTick
       void syncRef.current()
     }
-  }, [lastSynced, householdId])
+  }, [syncTick, householdId])
 
   // Polling effect — restarts whenever the active household changes
   useEffect(() => {

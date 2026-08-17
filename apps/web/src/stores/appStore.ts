@@ -11,6 +11,9 @@ interface AppState {
   transfers: SettlementTransfer[]
   isLoading: boolean
   lastSynced: number | null
+  /** Monotonic counter bumped by triggerSync. Distinct from lastSynced so a
+   *  sync finishing (which sets lastSynced) never re-triggers itself. */
+  syncTick: number
 }
 
 interface AppActions {
@@ -39,6 +42,7 @@ const initial: AppState = {
   transfers: [],
   isLoading: false,
   lastSynced: null,
+  syncTick: 0,
 }
 
 export const useAppStore = create<AppState & AppActions>()((set, get) => ({
@@ -88,7 +92,7 @@ export const useAppStore = create<AppState & AppActions>()((set, get) => ({
       setLastSynced: ts => set({ lastSynced: ts }),
 
       triggerSync: () => {
-        set({ lastSynced: Date.now() })
+        set(s => ({ syncTick: s.syncTick + 1 }))
       },
 
       recomputeBalances: () => {
