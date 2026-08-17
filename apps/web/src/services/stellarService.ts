@@ -176,7 +176,10 @@ class StellarService {
             throw new InsufficientBalanceError()
           }
           if (opCodes.includes('op_no_destination')) {
-            throw new Error('Destination account does not exist on Testnet. Ask them to fund it first.')
+            throw new Error(
+              `Destination account does not exist on ${config.stellar.network}. ` +
+              'Ask them to fund their account first.',
+            )
           }
           throw new Error(`Transaction failed: ${txCode} ${opCodes.join(', ')}`)
         }
