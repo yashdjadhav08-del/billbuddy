@@ -110,7 +110,10 @@ export function useSettlement() {
        if (!Number.isFinite(params.amount) || params.amount <= 0) {
          throw new Error('Amount must be a positive number.')
        }
-      if (payer === params.to) throw new Error('Sender and recipient cannot be the same account.')
+       if (!params.to) {
+         throw new Error('Recipient address is required.')
+       }
+       if (payer === params.to) throw new Error('Sender and recipient cannot be the same account.')
 
       setTxState({ status: 'signing', hash: null, error: null })
       try {
