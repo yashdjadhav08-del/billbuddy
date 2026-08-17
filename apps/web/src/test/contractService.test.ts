@@ -329,6 +329,35 @@ describe('contractService settlements (mock mode)', () => {
     expect(completed.status).toBe('completed')
     expect(completed.transactionHash).toBe('abc123')
   })
+
+  it('paySettlement completes a pending settlement (on-chain path)', async () => {
+    serverState.settlements = [makeSettlement()]
+
+    const settled = await service.paySettlement(1, 1, 'G-PAYER', 'CA-TokenContract')
+
+    expect(settled.status).toBe('completed')
+    expect(serverState.settlements[0].status).toBe('completed')
+  })
+
+  it('paySettlement rejects a caller who is not the payer', async () => {
+    serverState.settlements = [makeSettlement()]
+
+    await expect(service.paySettlement(1, 1, 'G-RECEIVER', 'CA-TokenContract')).rejects.toThrow(
+      'Only the payer can settle this payment',
+    )
+  })
+
+  it('paySettlement rejects an already completed settlement', async () => {
+    serverState.settlements = [makeSettlement({ status: 'completed' })]
+
+    await expect(service.paySettlement(1, 1, 'G-PAYER', 'CA-TokenContract')).rejects.toThrow(
+      'Settlement is already completed',
+    )
+  })
+
+  it('getTokenBalance is a no-op in mock mode', async () => {
+    await expect(service.getTokenBalance('G-PAYER', 'CA-TokenContract')).resolves.toBe(0)
+  })
 })
 
 describe('contractService.updateBill (mock mode)', () => {

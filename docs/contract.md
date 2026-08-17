@@ -26,9 +26,17 @@ VITE_SOROBAN_CONTRACT_ID=<contract-id>
 | `create_settlement(id, payer, receiver, amount, asset)` | payer | Record a pending settlement |
 | `complete_settlement(id, settlement_id, payer, tx_hash)` | payer | Mark completed with real tx hash |
 | `fail_settlement(id, settlement_id, payer)` | payer | Mark failed |
+| `pay_settlement(id, settlement_id, payer, token_contract)` | payer | **Inter-contract:** invoke the token (SAC) contract's `transfer` to move funds on-chain, then mark settled |
+| `get_token_balance(account, token_contract)` | — | **Inter-contract read:** query a token contract for an account's balance |
 | `get_settlement(id, settlement_id)` | — | Read a settlement |
 | `get_settlements(id)` | — | List all settlements |
 | `close_period(id, caller, label)` | owner | Lock period (requires zero balances) |
+
+> **Inter-contract communication** — `pay_settlement` calls the
+> Stellar Asset Contract (`transfer(payer, receiver, amount)`) inside the
+> same Soroban transaction. The token contract re-authenticates the payer and
+> moves balances atomically with the settlement record write. `get_token_balance`
+> demonstrates read-only cross-contract queries.
 
 ## Events emitted
 
