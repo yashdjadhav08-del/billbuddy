@@ -11,6 +11,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Allow any host so the app can be reached from mobile via a tunnel
+    // (e.g. *.trycloudflare.com) or a LAN IP without Vite's host check
+    // rejecting the request with a 403.
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: process.env.MOCK_SERVER_URL ?? 'http://127.0.0.1:8787',
