@@ -150,6 +150,7 @@ export function useSettlement() {
         const updated = await contractService.closePeriod(household.id, caller, periodLabel)
         useAppStore.getState().setHousehold(updated)
         toast.success(`${periodLabel} closed!`)
+        triggerSync()
         return updated
       } catch (err) {
         toast.error(friendlyContractError(err))
