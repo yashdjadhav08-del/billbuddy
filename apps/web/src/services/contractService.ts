@@ -763,6 +763,59 @@ class ContractService {
     return settlements.find(s => s.id === settlementId) ?? settlements[settlements.length - 1]
   }
 
+  /**
+   * Settle a payment entirely on-chain: the contract invokes the token
+   * (Stellar Asset) contract's `transfer` to move funds between members,
+   * then marks the settlement completed — all in one Soroban transaction.
+   *
+   * Inter-contract communication path (BillBuddy → SAC).
+   */
+  async paySettlement(
+    householdId: number,
+    settlementId: number,
+    payer: string,
+    tokenContractId: string,
+  ): Promise<Settlement> {
+    if (this.isMock) {
+      await mockDelay()
+      const state = await mockServerApi.getState()
+      const current = state.settlements.find(
+        s => s.id === settlementId && s.householdId === householdId,
+      )
+      if (!current) throw new Error('Settlement not found')
+      if (current.payer !== payer) throw new Error('Only the payer can settle this payment')
+      if (current.status === 'completed') throw new Error('Settlement is already completed')
+      if (current.status === 'failed') throw new Error('Settlement has already failed')
+      const updated: Settlement = { ...structuredClone(current), status: 'completed' }
+      await mockServerApi.updateState({
+        settlements: state.settlements.map(s => (s.id === settlementId ? updated : s)),
+      })
+      return structuredClone(updated)
+    }
+
+    await this.invokeContract(
+      'pay_settlement',
+      [scvU64(householdId), scvU64(settlementId), scvAddress(payer), scvAddress(tokenContractId)],
+      payer,
+    )
+    const settlements = await this.getSettlements(householdId)
+    return settlements.find(s => s.id === settlementId) ?? settlements[settlements.length - 1]
+  }
+
+  /**
+   * Read a member's token balance via the token (Stellar Asset) contract.
+   * Inter-contract read: BillBuddy queries the SAC for `account`'s balance.
+   */
+  async getTokenBalance(account: string, tokenContractId: string): Promise<number> {
+    if (this.isMock || !config.contracts.billbuddyContractId) return 0
+
+    const retval = await this.queryContract(
+      'get_token_balance',
+      [scvAddress(account), scvAddress(tokenContractId)],
+    )
+    return decodeNumber(retval)
+  }
+
   async getSettlements(householdId: number): Promise<Settlement[]> {
     if (this.isMock) {
       await mockDelay()
