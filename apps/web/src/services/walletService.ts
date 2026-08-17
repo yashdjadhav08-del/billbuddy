@@ -127,7 +127,20 @@ class WalletService {
       signTransaction: (xdr: string, opts: { networkPassphrase?: string; accountToSign?: string }) => Promise<string>
     }
 
-    const result = await api.signTransaction(xdr, { networkPassphrase })
+    // Timeout: if Freighter doesn't respond within 60s, assume it's disconnected
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => {
+        reject(new WalletRejectedError())
+      }, 60_000),
+    )
+
+    const result = await Promise.race([
+      api.signTransaction(xdr, { networkPassphrase }),
+      timeoutPromise,
+    ]).catch(err => {
+      if (err instanceof WalletRejectedError) throw err
+      throw new WalletRejectedError()
+    })
 
     if (!result) throw new WalletRejectedError()
 
