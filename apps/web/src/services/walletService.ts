@@ -144,17 +144,23 @@ class WalletService {
 
     if (!result) throw new WalletRejectedError()
 
-    const msg = typeof result === 'string' ? result : ''
+    // Freighter v2 should always return a signed XDR string. If we get
+    // something unexpected, treat it as a rejection rather than crashing.
+    if (typeof result !== 'string') {
+      throw new WalletRejectedError()
+    }
+
+    const msg = result.toLowerCase()
     if (
-      msg.toLowerCase().includes('reject') ||
-      msg.toLowerCase().includes('cancel') ||
-      msg.toLowerCase().includes('denied') ||
-      msg.toLowerCase().includes('user declined')
+      msg.includes('reject') ||
+      msg.includes('cancel') ||
+      msg.includes('denied') ||
+      msg.includes('user declined')
     ) {
       throw new WalletRejectedError()
     }
 
-    return result as string
+    return result
   }
 }
 
